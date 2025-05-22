@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple Crypto Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: #eee;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .crypto-card {
+    background: #1e1e1e;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  .crypto-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+  .price {
+    font-size: 1.3rem;
+    margin-top: 5px;
+  }
+  .change-positive {
+    color: #4caf50;
+  }
+  .change-negative {
+    color: #f44336;
+  }
+</style>
+</head>
+<body>
+
+<h1>Simple Crypto Dashboard</h1>
+
+<div id="crypto-container">
+  <!-- Cards will be inserted here -->
+</div>
+
+<script>
+  const cryptos = ['bitcoin', 'ethereum', 'dogecoin'];
+
+  function formatPrice(price) {
+    return '$' + price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function createCard(coin) {
+    const div = document.createElement('div');
+    div.className = 'crypto-card';
+    div.id = coin.id + '-card';
+    div.innerHTML = `
+      <div class="crypto-name">${coin.name} (${coin.symbol.toUpperCase()})</div>
+      <div class="price" id="${coin.id}-price">${formatPrice(coin.current_price)}</div>
+      <div>24h Change: <span id="${coin.id}-change" class="${coin.price_change_percentage_24h >= 0 ? 'change-positive' : 'change-negative'}">${coin.price_change_percentage_24h.toFixed(2)}%</span></div>
+    `;
+    return div;
+  }
+
+  async function fetchData() {
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=' + cryptos.join(','));
+      const data = await res.json();
+
+      const container = document.getElementById('crypto-container');
+      container.innerHTML = ''; // clear previous
+
+      data.forEach(coin => {
+        const card = createCard(coin);
+        container.appendChild(card);
+      });
+    } catch (e) {
+      console.error('Failed to fetch crypto data', e);
+    }
+  }
+
+  // Fetch first time, then refresh every minute
+  fetchData();
+  setInterval(fetchData, 60 * 1000);
+</script>
+
+</body>
+</html>
