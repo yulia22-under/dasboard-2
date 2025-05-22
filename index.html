@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crypto Dashboard with MA & RSI</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #121212;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .crypto-container {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .crypto-card {
+    background: #1e1e1e;
+    border-radius: 10px;
+    padding: 20px;
+    width: 350px;
+    box-shadow: 0 0 10px #00ff99;
+  }
+  .crypto-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .crypto-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+  .price {
+    font-size: 1.3rem;
+  }
+  .change-positive {
+    color: #4caf50;
+  }
+  .change-negative {
+    color: #f44336;
+  }
+  canvas {
+    margin-top: 15px;
+  }
+  .volume {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #bbb;
+  }
+  .alert-input {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .alert-input input {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 5px;
+    border: none;
+    font-size: 0.9rem;
+  }
+  .alert-input button {
+    padding: 6px 12px;
+    background-color: #00ff99;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #121212;
+  }
+  .alert-message {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: #ff9800;
+    font-weight: bold;
+  }
+  .technical {
+    margin-top: 12px;
+    font-size: 0.9rem;
+    color: #ccc;
+  }
+  .rsi-good {
+    color: #4caf50;
+  }
+  .rsi-bad {
+    color: #f44336;
+  }
+</style>
+</head>
+<body>
+
+<h1>Crypto Market Dashboard with MA & RSI</h1>
+
+<div class="crypto-container">
+  <div class="crypto-card" id="bitcoin-card">
+    <div class="crypto-header">
+      <div class="crypto-name">Bitcoin (BTC)</div>
+      <div class="price" id="btc-price">$--</div>
+    </div>
+    <div>24h Change: <span id="btc-change" class="change-positive">--%</span></div>
+    <div class="volume" id="btc-volume">Volume 24h: --</div>
+    <canvas id="btc-chart" width="320" height="160"></canvas>
+    <div class="alert-input">
+      <input type="number" id="btc-alert-price" placeholder="Set alert price $" />
+      <button onclick="setAlert('bitcoin')">Set Alert</button>
+    </div>
+    <div class="alert-message" id="btc-alert-msg"></div>
+    <div class="technical" id="btc-tech"></div>
+  </div>
+
+  <div class="crypto-card" id="ethereum-card">
+    <div class="crypto-header">
+      <div class="crypto-name">Ethereum (ETH)</div>
+      <div class="price" id="eth-price">$--</div>
+    </div>
+    <div>24h Change: <span id="eth-change" class="change-positive">--%</span></div>
+    <div class="volume" id="eth-volume">Volume 24h: --</div>
+    <canvas id="eth-chart" width="320" height="160"></canvas>
+    <div class="alert-input">
+      <input type="number" id="eth-alert-price" placeholder="Set alert price $" />
+      <button onclick="setAlert('ethereum')">Set Alert</button>
+    </div>
+    <div class="alert-message" id="eth-alert-msg"></div>
+    <div class="technical" id="eth-tech"></div>
+  </div>
+
+  <div class="crypto-card" id="dogecoin-card">
+    <div class="crypto-header">
+      <div class="crypto-name">Dogecoin (DOGE)</div>
+      <div class="price" id="doge-price">$--</div>
+    </div>
+    <div>24h Change: <span id="doge-change" class="change-positive">--%</span></div>
+    <div class="volume" id="doge-volume">Volume 24h: --</div>
+    <canvas id="doge-chart" width="320" height="160"></canvas>
+    <div class="alert-input">
+      <input type="number" id="doge-alert-price" placeholder="Set alert price $" />
+      <button onclick="setAlert('dogecoin')">Set Alert</button>
+    </div>
+    <div class="alert-message" id="doge-alert-msg"></div>
+    <div class="technical" id="doge-tech"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const alerts = {
+    bitcoin: null,
+    ethereum: null,
+    dogecoin: null,
+  };
+
+  function formatVolume(num) {
+    if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+    if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+    if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
+    return num;
+  }
+
+  // Simple Moving Average calculation
+  function calculateSMA(data, period) {
+    if (data.length < period) return null;
+    let sum = 0;
+    for (let i = data.length - period; i < data.length; i++) {
+      sum += data[i];
+    }
+    return sum / period;
+  }
+
+  // Relative Strength Index (RSI) calculation for period 14
+  function calculateRSI(data, period = 14) {
+    if (data.length <= period) return null;
+    let gains = 0;
+    let losses = 0;
+    for (let i = data.length - period; i < data.length - 1; i++) {
+      const diff = data[i + 1] - data[i];
+      if (diff > 0) gains += diff;
+      else losses -= diff;
+    }
+    if (losses === 0) return 100;
+    const rs = gains / losses;
+    return 100 - 100 / (1 + rs);
+  }
+
+  async function fetchCryptoData() {
+    const apiUrl =
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,dogecoin&order=market_cap_desc&per_page=3&page=1&sparkline=true";
+
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      data.forEach((coin) => {
+        const priceEl = document.getElementById(`${coin.id}-price`);
+        const changeEl = document.getElementById(`${coin.id}-change`);
+        const volumeEl = document.getElementById(`${coin.id}-volume`);
+        const alertMsgEl = document.getElementById(`${coin.id}-alert-msg`);
+        const techEl = document.getElementById(`${coin.id}-tech`);
+
+        priceEl.textContent = `$${coin.current_price.toLocaleString()}`;
+        const changePercent = coin.price_change_percentage_24h.toFixed(2);
+        changeEl.textContent = `${changePercent}%`;
+        changeEl.className = changePercent >= 0 ? "change-positive" : "change-negative";
+
+        volumeEl.textContent = `Volume 24h: $${formatVolume(coin.total_volume)}`;
+
+        // Cek alert price
+        if (alerts[coin.id] !== null) {
+          if ((coin.current_price >= alerts[coin.id] && alerts[coin.id] !== "triggered")) {
+            alertMsgEl.textContent = `⚠️ Alert! ${coin.name} price has reached $${alerts[coin.id]}`;
+            alerts[coin.id] = "triggered"; // supaya gak berulang
+            alert(`${coin.name} price alert! Price reached $${coin.current_price}`);
+          }
+        } else {
+          alertMsgEl.textContent = "";
+        }
+
+        // Technical Analysis
+        const prices = coin.sparkline_in_7d.price;
+        const ma7 = calculateSMA(prices, 7);
+        const ma14 = calculateSMA(prices, 14);
+        const rsi = calculateRSI(prices, 14);
+
+        let techMsg = "";
+        if (ma7 && ma14) {
+          techMsg += `MA7: $${ma7.toFixed(2)} | MA14: $${ma14.toFixed(2)} | `;
+          techMsg += ma7 > ma14 ? "Uptrend" : "Downtrend";
+        }
+        if (rsi !== null) {
+          techMsg += ` | RSI(14): `;
+          techMsg += rsi > 70
+            ? `<span class="rsi-bad">Overbought (${rsi.toFixed(1)})</span>`
+            : rsi < 30
+            ? `<span class="rsi-good">Oversold (${rsi.toFixed(1)})</span>`
+            : `<span>${rsi.toFixed(1)}</span>`;
+        }
+        techEl.innerHTML = techMsg;
+
+        // Prepare sparkline + MA chart data
+        const ctx = document.getElementById(`${coin.id}-chart`).getContext("2d");
+
+        const labels = prices.map((_, i) => i);
+        const ma7Array = [];
+        const ma14Array = [];
+
+        for (let i = 0; i < prices.length; i++) {
+          if (i >= 6) {
+            let sum7 = 0;
+            for (let j = i - 6; j <= i; j++) sum7 += prices[j];
+            ma7Array.push(sum7 / 7);
+          } else {
+            ma7Array.push(null);
+          }
+          if (i >= 13) {
+            let sum14 = 0;
+            for (let j = i - 13; j <= i; j++) sum14 += prices[j];
+            ma14Array.push(sum14 / 14);
+          } else {
+            ma14Array.push(null);
+          }
+        }
+
+        if (window[coin.id + "Chart"]) {
+          window[coin.id + "Chart"].data.labels = labels;
+          window[coin.id + "Chart"].data.datasets[0].data = prices;
+          window[coin.id + "Chart"].data.datasets[1].data = ma7Array;
+          window[coin.id + "Chart"].data.datasets[2].data = ma14Array;
+          window[coin.id + "Chart"].update();
+        } else {
+          window[coin.id + "Chart"] = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: "Price",
+                  data: prices,
+                  borderColor: changePercent >= 0 ? "#4caf50" : "#f44336",
+                  backgroundColor: "transparent",
+                  borderWidth: 2,
+                  pointRadius: 0,
+                  tension: 0.3,
+                },
+                {
+                  label: "MA7",
+                  data: ma7Array,
+                  borderColor: "#00bcd4",
+                  backgroundColor: "transparent",
+                  borderWidth
